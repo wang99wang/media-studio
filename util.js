@@ -44,37 +44,36 @@
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     },
 
-    // ---------- 全量导出 / 导入 ----------
+    // ---------- 全量导出 / 导入（覆盖所有模块） ----------
     async exportAll() {
-      const stores = ['accounts', 'works', 'topics', 'inspirations', 'scripts', 'materials', 'settings'];
-      const out = { _app: 'creator-studio', _ver: 1, _time: new Date().toISOString(), data: {} };
-      for (const s of stores) out.data[s] = await DB.all(s);
-      // 素材转 base64 以便随包迁移
+      const stores = Object.keys(DB.S);            // 账号/作品/选题/素材/小说/标题/数据/对标/排期/网址收藏/设置 等全部 store
+      const out = { _app: 'creator-studio', _ver: 4, _time: new Date().toISOString(), data: {} };
+      for (const s of stores) { try { out.data[s] = await DB.all(s); } catch (e) { out.data[s] = []; } }
+      // 素材二进制转 dataURL，随 JSON 一起迁移
       for (const m of (out.data.materials || [])) {
-        if (m.blob) {
-          try { m.dataUrl = await U.blobToDataURL(m.blob); delete m.blob; } catch (e) {}
-        }
+        if (m.blob) { try { m.dataUrl = await U.blobToDataURL(m.blob); delete m.blob; } catch (e) {} }
       }
-      U.download('创作剪辑台-备份-' + U.today() + '.json', JSON.stringify(out, null, 2), 'application/json');
-      U.toast('已导出全部数据（含素材）', true);
+      U.download('创作剪辑台-全量备份-' + U.today() + '.json', JSON.stringify(out, null, 2), 'application/json');
+      U.toast('已导出全部数据（共 ' + stores.length + ' 个模块）', true);
     },
     async importAll(file) {
       const text = await file.text();
       let json;
       try { json = JSON.parse(text); } catch (e) { U.toast('文件不是有效 JSON'); return; }
       const data = json.data || json;
-      for (const s of Object.keys(data)) {
-        if (!DB.S[s]) continue;
+      const stores = Object.keys(data).filter(s => DB.S[s]);
+      if (!stores.length) { U.toast('备份文件里没有可识别的数据'); return; }
+      if (!confirm('导入将覆盖当前这 ' + stores.length + ' 个模块的数据，确定继续？\n（建议先点「导出全部数据」留一份当前备份）')) return;
+      for (const s of stores) {
+        try { await DB.clear(s); } catch (e) {}
         for (const item of (data[s] || [])) {
-          if (item.dataUrl && item.blob === undefined) {
-            try { item.blob = await U.dataURLToBlob(item.dataUrl); } catch (e) {}
-            delete item.dataUrl;
-          }
-          if (item.id) await DB._rawPut(s, item);
+          if (!item || !item.id) continue;
+          if (item.dataUrl && item.blob === undefined) { try { item.blob = await U.dataURLToBlob(item.dataUrl); } catch (e) {} delete item.dataUrl; }
+          try { await DB._rawPut(s, item); } catch (e) {}
         }
       }
-      U.toast('导入完成，刷新中…', true);
-      setTimeout(() => location.reload(), 700);
+      U.toast('导入完成，正在刷新…', true);
+      setTimeout(() => location.reload(), 800);
     },
 
     blobToDataURL(blob) {

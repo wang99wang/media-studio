@@ -763,6 +763,14 @@
     };
   };
 
+  // 导入全部数据：弹出文件选择 -> U.importAll
+  Main.importBackup = function () {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = () => { if (inp.files && inp.files[0]) U.importAll(inp.files[0]); };
+    inp.click();
+  };
+
   Main.useScript = name => {
     const s = (window.Libs.scripts().find(x => x.name === name)); if (!s) return;
     navigator.clipboard.writeText(s.tpl); U.toast('脚本模板已复制', true);

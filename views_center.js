@@ -143,6 +143,14 @@
       <div class="section-title">🏆 作品 Top 榜 <span class="badge">按播放</span></div>
       <button class="btn sm ghost" style="margin-bottom:12px" onclick="Main.dashAI()">📊 AI 数据诊断</button>
       ${topHtml}
+    </div>
+    <div class="card" style="margin-top:18px">
+      <div class="section-title">💾 数据备份 / 跨设备迁移</div>
+      <p class="muted" style="font-size:12.5px;margin:0 0 12px">数据存在本地浏览器，各设备不互通。换手机/电脑前先「导出全部数据」存一份 JSON；到新设备点「导入全部数据」选该文件即可迁移（覆盖当前设备数据，建议先导出留底）。</p>
+      <div class="row" style="gap:10px;flex-wrap:wrap">
+        <button class="btn primary sm" onclick="U.exportAll()">⬇ 导出全部数据</button>
+        <button class="btn ghost sm" onclick="Main.importBackup()">⬆ 导入全部数据</button>
+      </div>
     </div>`;
 
     function stat(icon, k, v, bg, col, d) {
