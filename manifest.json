@@ -1,0 +1,17 @@
+{
+  "name": "自媒体创作剪辑工作台",
+  "short_name": "创作剪辑台",
+  "description": "自媒体创作中心 + AI 剪辑工坊，本地离线可用，可部署云端同步。",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f2ff",
+  "theme_color": "#7c5cff",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-180.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
