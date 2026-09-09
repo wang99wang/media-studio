@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [main]
+jobs:
+  js-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: syntax check all JS
+        run: |
+          ok=1
+          for f in *.js; do
+            node --check "$f" || ok=0
+          done
+          if [ "$ok" = "0" ]; then echo "JS SYNTAX ERROR"; exit 1; fi
+          echo "All JS passed node --check"
