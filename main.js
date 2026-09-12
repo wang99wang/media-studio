@@ -808,12 +808,13 @@
     await buildNav();
     await Cloud.init();
     await seed();
+    await Sync.init();
     await applyWbName();
     M.go('center_dashboard');
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(() => {});
     }
-    window.addEventListener('online', () => Cloud.sync());
+    window.addEventListener('online', () => { Cloud.sync(); Sync.init(); });
     if (navigator.onLine) setTimeout(() => Cloud.sync(), 1500);
   })();
 

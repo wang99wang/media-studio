@@ -1,4 +1,4 @@
-const CACHE = 'creator-studio-v3';
+const CACHE = 'creator-studio-v4';
 const ASSETS = [
   '.',
   'index.html',
@@ -24,6 +24,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // 局域网共享 API：始终走网络、禁止缓存，否则手机会读到旧数据
+  const _url = new URL(req.url);
+  if (_url.pathname.indexOf('/api/') === 0) {
+    e.respondWith(fetch(req).catch(() => new Response('{"ok":false}', { status: 504, headers: { 'Content-Type': 'application/json' } })));
+    return;
+  }
   // 页面 HTML 走网络优先：发新版后不会一直读到旧页面
   const isHTML = req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') >= 0;
   if (isHTML) {

@@ -1,0 +1,5 @@
+# 局域网共享服务的运行数据（每台设备各自生成，不要入库）
+data.json
+data.json.bak
+node_modules/
+*.log

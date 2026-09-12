@@ -80,6 +80,7 @@
         if (ex) { ex.updated = obj.updated; await this._rawPut('syncq', ex); }
         else await this._rawPut('syncq', { id: store + ':' + obj.id, store, id: obj.id, updated: obj.updated, op: 'upsert' });
       } catch (e) {}
+      Sync.touch(store);
       return obj;
     },
     _rawPut(store, obj) {
@@ -88,6 +89,7 @@
     async del(store, id) {
       await tx(S[store], 'readwrite').then(os => req2p(os.delete(id)));
       try { await this._rawPut('syncq', { id: store + ':' + id, store, id, op: 'delete', updated: Date.now() }); } catch (e) {}
+      Sync.touch(store);
     },
     clear(store) {
       return tx(S[store], 'readwrite').then(os => req2p(os.clear()));
@@ -100,4 +102,119 @@
     }
   };
   window.DB = DB;
+
+  /* ============ 局域网共享同步层 ============
+   * 探测同源后端 /api/ping：
+   *   - 有后端：拉取服务器数据覆盖本地（服务器为当前真相），之后本地任何写操作 debounce 推送全量
+   *   - 无后端（如 GitHub Pages）：保持纯前端 IndexedDB 模式，完全不受影响
+   * 数据统一存在本机 server.js 的 data.json，手机连同一 WiFi 访问即共享同一份。
+   */
+  const Sync = window.Sync = {
+    enabled: false,
+    ready: false,
+    timer: null,
+    _pending: new Set(),
+    async ping() {
+      try {
+        const r = await fetch('api/ping?t=' + Date.now(), { cache: 'no-store', headers: { 'Cache-Control': 'no-store' } });
+        if (!r.ok) return false;
+        const j = await r.json();
+        return !!(j && j.ok);
+      } catch (e) { return false; }
+    },
+    async init() {
+      this.refresh();
+      if (!navigator.onLine) return;
+      const ok = await this.ping();
+      if (!ok) { this.enabled = false; this.ready = false; this.refresh(); return; }
+      this.enabled = true;
+      try {
+        const serverData = await this.fetchData();
+        const empty = !serverData || !serverData.data || Object.keys(serverData.data).length === 0;
+        if (empty) {
+          // 服务器还没有数据：把本机现有数据推上去（避免空拉清空本地）
+          await this.push();
+        } else {
+          await this.applyServer(serverData);
+        }
+        this.ready = true;
+        this.refresh();
+        if (typeof U !== 'undefined' && U.toast) U.toast('已连接本机共享服务，数据跨设备同步', true);
+      } catch (e) {
+        this.enabled = false;
+        this.ready = false;
+        this.refresh();
+      }
+    },
+    refresh() {
+      const dot = document.getElementById('lanDot');
+      const txt = document.getElementById('lanText');
+      if (!dot || !txt) return;
+      if (this.ready) { dot.className = 'dot ok'; txt.textContent = '共享模式·已同步'; }
+      else if (this.enabled) { dot.className = 'dot'; txt.textContent = '共享模式·连接中'; }
+      else { dot.className = 'dot warn'; txt.textContent = '本地模式'; }
+    },
+    async fetchData() {
+      const r = await fetch('api/data?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return null;
+      return await r.json();
+    },
+    async applyServer(d) {
+      const data = (d && d.data) || {};
+      for (const s of Object.keys(S)) {
+        if (s === 'syncq') continue; // 不同步本地队列
+        const items = (data[s] || []).filter(it => it && it.id);
+        await this.clearStore(s);
+        for (const it of items) {
+          // 素材图片：服务器存的是 dataUrl，转回 blob 存本地
+          if (s === 'materials' && it.dataUrl && it.blob === undefined) {
+            try { it.blob = await U.dataURLToBlob(it.dataUrl); } catch (e) {}
+            delete it.dataUrl;
+          }
+          try { await DB._rawPut(s, it); } catch (e) {}
+        }
+      }
+    },
+    async clearStore(s) {
+      try { await DB.clear(s); } catch (e) {}
+    },
+    async pack() {
+      const out = {};
+      for (const s of Object.keys(S)) {
+        if (s === 'syncq') { out[s] = []; continue; }
+        const items = await DB.all(s);
+        if (s === 'materials' && typeof U !== 'undefined' && U.blobToDataURL) {
+          for (const m of items) {
+            if (m.blob) {
+              try {
+                const url = await U.blobToDataURL(m.blob);
+                if (url && url.length < 4 * 1024 * 1024) { m.dataUrl = url; delete m.blob; }
+              } catch (e) { delete m.blob; }
+            }
+          }
+        }
+        out[s] = items;
+      }
+      return out;
+    },
+    async push() {
+      if (!this.enabled) return;
+      try {
+        const payload = await this.pack();
+        const r = await fetch('api/data', {
+          method: 'POST',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: payload })
+        });
+        if (!r.ok) throw new Error('push failed ' + r.status);
+      } catch (e) { /* 服务不可用静默忽略 */ }
+    },
+    touch(store) {
+      if (!this.ready) return;
+      if (store) this._pending.add(store);
+      clearTimeout(this.timer);
+      this.timer = setTimeout(() => { this.push(); }, 600);
+    }
+  };
 })();
